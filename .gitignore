@@ -1,0 +1,5 @@
+
+# Only data/eu.json matters here -- the fetch script now lives inline in
+# .github/workflows/update.yml, and README.md/tools/ stay local-only.
+tools/
+README.md
