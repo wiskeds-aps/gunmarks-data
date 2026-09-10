@@ -19,7 +19,91 @@ jobs:
           python-version: "3.x"
 
       - name: Fetch latest thresholds from poliroid.me
-        run: python3 tools/fetch_poliroid.py
+        run: |
+          python3 - <<'PYEOF'
+          # Pulls real per-vehicle Marks of Excellence damage thresholds
+          # (65/85/95/100%) from poliroid.me/gunmarks/'s public,
+          # unauthenticated API and writes them to data/<realm>.json.
+          #
+          # Response shape confirmed live 2026-09-10:
+          #   GET https://poliroid.me/gunmarks/api/v2/data/{realm}/vehicles/{percents}
+          #   -> {"status": "ok", "data": {"meta": {"count": 813, ...},
+          #                                 "data": [{"id": <int>, "marks": {"65": <int>, ...}}, ...]}}
+          #
+          # `id` is the vehicle's own compactDescr int, NOT a poliroid-internal
+          # id -- confirmed by decoding it against wot-src's items/__init__.py
+          # (makeIntCompactDescrByID: compactDescr = (innationID << 8) |
+          # (nationID << 4) | itemTypeID, itemTypeID=1 for 'vehicle') and
+          # cross-checking id=53409 decodes to nationID=10 (Italy) matching
+          # Prototipo 6, which the bulk endpoint independently names via
+          # api/v2/vehicles/eu/ru. Same convention XVM's own wn8exp.json
+          # dataset uses -- this is the de-facto community standard tank_id,
+          # not a poliroid-specific scheme.
+          import json
+          import sys
+          import time
+          import urllib.error
+          import urllib.request
+
+          REALM = "eu"
+          PERCENTS = "65,85,95,100"
+          URL = "https://poliroid.me/gunmarks/api/v2/data/%s/vehicles/%s" % (REALM, PERCENTS)
+          OUTPUT_PATH = "data/%s.json" % REALM
+          TIMEOUT = 30
+          MAX_RETRIES = 3
+          RETRY_DELAY = 10
+
+          def fetch():
+              request = urllib.request.Request(
+                  URL,
+                  headers={
+                      "User-Agent": "gunmarks-data-fetcher/1.0 (+https://github.com/wiskeds-aps/gunmarks-data)",
+                      "Referer": "https://poliroid.me/gunmarks/",
+                  },
+              )
+              lastError = None
+              for attempt in range(1, MAX_RETRIES + 1):
+                  try:
+                      with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+                          body = json.load(response)
+                      if body.get("status") != "ok":
+                          raise ValueError("unexpected status: %r" % body.get("status"))
+                      return body["data"]["data"]
+                  except (urllib.error.URLError, ValueError, KeyError) as exc:
+                      lastError = exc
+                      print("[%d/%d] fetch failed: %r" % (attempt, MAX_RETRIES, exc), file=sys.stderr)
+                      if attempt < MAX_RETRIES:
+                          time.sleep(RETRY_DELAY)
+              raise SystemExit("giving up after %d attempts: %r" % (MAX_RETRIES, lastError))
+
+          entries = fetch()
+          thresholds = {}
+          for entry in entries:
+              try:
+                  compactDescr = int(entry["id"])
+                  marks = entry["marks"]
+                  thresholds[str(compactDescr)] = {
+                      percent: int(marks[percent]) for percent in ("65", "85", "95", "100") if percent in marks
+                  }
+              except (KeyError, TypeError, ValueError):
+                  continue
+
+          output = {
+              "meta": {
+                  "source": URL,
+                  "realm": REALM,
+                  "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                  "vehicle_count": len(thresholds),
+              },
+              "thresholds": thresholds,
+          }
+
+          with open(OUTPUT_PATH, "w") as f:
+              json.dump(output, f, indent=2, sort_keys=True)
+              f.write("\n")
+
+          print("wrote %d vehicles to %s" % (len(thresholds), OUTPUT_PATH))
+          PYEOF
 
       - name: Commit if changed
         run: |
