@@ -19,7 +19,7 @@ jobs:
           python-version: "3.x"
 
       - name: Fetch latest thresholds from poliroid.me
-        run: python3 scripts/fetch_poliroid.py
+        run: python3 tools/fetch_poliroid.py
 
       - name: Commit if changed
         run: |

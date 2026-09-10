@@ -23,8 +23,8 @@ here instead (`raw.githubusercontent.com/.../data/eu.json`).
 Source: `https://poliroid.me/gunmarks/api/v2/data/eu/vehicles/65,85,95,100`
 (public, no authentication). This project is not affiliated with
 poliroid.me or Wargaming. Data is refreshed weekly (Mondays, 04:00 UTC) --
-see `scripts/fetch_poliroid.py`. Run it manually with `python3
-scripts/fetch_poliroid.py` from the repo root; it overwrites `data/eu.json`.
+see `tools/fetch_poliroid.py`. Run it manually with `python3
+tools/fetch_poliroid.py` from the repo root; it overwrites `data/eu.json`.
 
 ## `data/eu.json` shape
 
@@ -40,4 +40,4 @@ scripts/fetch_poliroid.py` from the repo root; it overwrites `data/eu.json`.
 `<compactDescr>` is the vehicle's own WoT client compactDescr int (the
 same int `g_currentVehicle.intCD` / `vInfo.vehicleType.compactDescr`
 already is in-client) -- not a poliroid-internal id. See
-`scripts/fetch_poliroid.py`'s docstring for how that was confirmed.
+`tools/fetch_poliroid.py`'s docstring for how that was confirmed.
